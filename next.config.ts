@@ -1,7 +1,11 @@
+// next.config.ts
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  reactStrictMode: true,
+  experimental: {
+    // keep default; App Router is already used
+  },
 };
 
 export default nextConfig;
