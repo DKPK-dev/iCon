@@ -1,0 +1,35 @@
+# apphosting.yaml — Firebase App Hosting config
+
+# ---- Runtime (Node 20 for Next.js App Router) ----
+runtime:
+  nodeVersion: "20"
+
+# ---- Environment variables (non-secret) ----
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+  NEXT_PUBLIC_APP_NAME: "iCon V2V Assistant"
+  REALTIME_MODEL: "gpt-realtime"
+  REALTIME_VOICE: "verse"
+
+# ---- Secrets (from Firebase App Hosting → Secrets) ----
+#   The value on the right is the *secret name* you created in the console.
+#   In code you read it as process.env.OPENAI_API_KEY
+secretEnv:
+  OPENAI_API_KEY: "OPENAI_API_KEY"
+
+# ---- Resources & scaling ----
+#   Adjust based on traffic. Concurrency is how many requests a single instance handles.
+resources:
+  cpu: 1            # 0.5, 1, 2, 4
+  memoryMiB: 1024   # 512, 1024, 2048, 4096
+  concurrency: 80   # typical for Next.js SSR/API
+
+# ---- Timeouts (server-side routes) ----
+timeouts:
+  requestSeconds: 60  # increase if your API work can take longer
+
+# ---- Build/Start (usually automatic for Next.js; override only if needed) ----
+# build:
+#   command: "npm run build"
+# start:
+#   command: "npm start"
