@@ -1,14 +1,20 @@
-# apphosting.yaml — Firebase App Hosting config
+# apphosting.yaml — Firebase App Hosting config (array-based env schema)
 
 runtime:
   nodeVersion: "20"
 
+# ---- Plain environment variables (array schema) ----
 env:
-  NEXT_TELEMETRY_DISABLED: "1"
-  NEXT_PUBLIC_APP_NAME: "iCon V2V Assistant"
-  REALTIME_MODEL: "gpt-realtime"
-  REALTIME_VOICE: "verse"
+  - key: NEXT_TELEMETRY_DISABLED
+    value: "1"
+  - key: NEXT_PUBLIC_APP_NAME
+    value: "iCon V2V Assistant"
+  - key: REALTIME_MODEL
+    value: "gpt-realtime"
+  - key: REALTIME_VOICE
+    value: "verse"
 
+# ---- Secrets (array schema) ----
 secretEnv:
   - key: OPENAI_API_KEY
     secret: OPENAI_API_KEY
