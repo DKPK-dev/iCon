@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 
 // simple sine wave visualizer
 function drawWaves(analyser: AnalyserNode, canvas: HTMLCanvasElement) {
@@ -30,9 +30,22 @@ export default function Home() {
   const [status, setStatus] = useState("Tap the mic to start");
   const [listening, setListening] = useState(false);
   const [connecting, setConnecting] = useState(false);
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const ctxRef = useRef<AudioContext | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const pcRef = useRef<RTCPeerConnection | null>(null);
+
+  async function getToken() {
+    const r = await fetch("/api/ephemeral", { method: "POST" });
+    if (!r.ok) {
+      const t = await r.text();
+      throw new Error(`Token failed: ${r.status} ${t}`);
+    }
+    const { value } = await r.json(); // ek_...
+    if (!value) throw new Error("No ek token in response");
+    return value;
+  }
 
   async function start() {
     if (connecting) return;
@@ -41,17 +54,60 @@ export default function Home() {
     try {
       // mic
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+
+      // audio context for waves
       const ctx = new AudioContext();
       const src = ctx.createMediaStreamSource(stream);
       const analyser = ctx.createAnalyser();
       src.connect(analyser);
       drawWaves(analyser, canvasRef.current!);
-      streamRef.current = stream;
-      ctxRef.current = ctx;
+      audioCtxRef.current = ctx;
 
-      // backend call
-      const token = await fetch("/api/ephemeral").then((r) => r.json());
-      if (!token?.client_secret?.value) throw new Error("Token failed");
+      // mint ephemeral token
+      const ek = await getToken();
+
+      // WebRTC to OpenAI Realtime
+      const pc = new RTCPeerConnection();
+      pcRef.current = pc;
+
+      // send mic
+      stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+
+      // receive assistant audio
+      const audio = document.createElement("audio");
+      audio.autoplay = true;
+      pc.ontrack = (evt) => {
+        audio.srcObject = evt.streams[0];
+      };
+
+      // optional data channel (events, logs)
+      const dc = pc.createDataChannel("oai-events");
+      dc.onmessage = (e) => console.log("assistant:", e.data);
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      const sdpRes = await fetch(
+        "https://api.openai.com/v1/realtime?protocol=webrtc",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${ek}`, // ephemeral client secret
+            "Content-Type": "application/sdp",
+          },
+          body: offer.sdp!,
+        }
+      );
+
+      if (!sdpRes.ok) {
+        const t = await sdpRes.text();
+        throw new Error(`Realtime SDP failed: ${sdpRes.status} ${t}`);
+      }
+
+      const answerSdp = await sdpRes.text();
+      await pc.setRemoteDescription({ type: "answer", sdp: answerSdp });
+
       setStatus("Connected — listening");
       setListening(true);
     } catch (err) {
@@ -63,10 +119,19 @@ export default function Home() {
   }
 
   function stop() {
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    ctxRef.current?.close();
-    setListening(false);
-    setStatus("Stopped");
+    try {
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+
+      audioCtxRef.current?.close();
+      audioCtxRef.current = null;
+
+      pcRef.current?.close();
+      pcRef.current = null;
+    } finally {
+      setListening(false);
+      setStatus("Stopped");
+    }
   }
 
   return (
@@ -98,7 +163,7 @@ export default function Home() {
       />
 
       <div style={{ display: "flex", gap: "2rem" }}>
-        {/* Mic On / Off buttons */}
+        {/* Mic On */}
         <button
           onClick={start}
           disabled={connecting || listening}
@@ -115,10 +180,12 @@ export default function Home() {
             color: "#00112b",
             fontSize: 24,
           }}
+          title="Start"
         >
           🎙️
         </button>
 
+        {/* Stop */}
         <button
           onClick={stop}
           disabled={!listening}
@@ -133,6 +200,7 @@ export default function Home() {
             color: "#fff",
             fontSize: 24,
           }}
+          title="Stop"
         >
           ⏹️
         </button>
