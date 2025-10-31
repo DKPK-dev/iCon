@@ -1,20 +1,9 @@
-# apphosting.yaml — Firebase App Hosting config (array-based env schema)
+# apphosting.yaml — minimal to bypass env/pack conflict
 
 runtime:
   nodeVersion: "20"
 
-# ---- Plain environment variables (array schema) ----
-env:
-  - key: NEXT_TELEMETRY_DISABLED
-    value: "1"
-  - key: NEXT_PUBLIC_APP_NAME
-    value: "iCon V2V Assistant"
-  - key: REALTIME_MODEL
-    value: "gpt-realtime"
-  - key: REALTIME_VOICE
-    value: "verse"
-
-# ---- Secrets (array schema) ----
+# Only the secret (array schema)
 secretEnv:
   - key: OPENAI_API_KEY
     secret: OPENAI_API_KEY
@@ -26,3 +15,10 @@ resources:
 
 timeouts:
   requestSeconds: 60
+
+# Explicit build/start commands (so the builder just runs these)
+build:
+  command: "npm ci && npm run build"
+
+start:
+  command: "npm start"
